@@ -285,6 +285,10 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
   zmq::socket_t cache_ip_response_puller(context, ZMQ_PULL);
   cache_ip_response_puller.bind(wt.cache_ip_response_bind_address());
 
+  // listen for lambda IP collection.
+  zmq::socket_t lambda_ip_collection_puller(context, ZMQ_PULL);
+  lambda_ip_collection_puller.bind(wt.lambda_ip_collection_bind_address());
+
   //  Initialize poll set
   vector<zmq::pollitem_t> pollitems = {
       {static_cast<void *>(join_puller), 0, ZMQ_POLLIN, 0},
@@ -294,7 +298,9 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
       {static_cast<void *>(gossip_puller), 0, ZMQ_POLLIN, 0},
       {static_cast<void *>(replication_response_puller), 0, ZMQ_POLLIN, 0},
       {static_cast<void *>(replication_change_puller), 0, ZMQ_POLLIN, 0},
-      {static_cast<void *>(cache_ip_response_puller), 0, ZMQ_POLLIN, 0}};
+      {static_cast<void *>(cache_ip_response_puller), 0, ZMQ_POLLIN, 0},
+      {static_cast<void *>(lambda_ip_collection_puller), 0, ZMQ_POLLIN, 0}};
+
 
   auto gossip_start = std::chrono::system_clock::now();
   auto gossip_end = std::chrono::system_clock::now();
@@ -302,7 +308,7 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
   auto report_end = std::chrono::system_clock::now();
 
   unsigned long long working_time = 0;
-  unsigned long long working_time_map[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+  unsigned long long working_time_map[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   unsigned epoch = 0;
 
   // enter event loop
@@ -482,6 +488,35 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
       working_time += time_elapsed;
       working_time_map[8] += time_elapsed;
     }
+
+    if (pollitems[9].revents & ZMQ_POLLIN) {
+    // gossip updates to other threads
+      auto work_start = std::chrono::system_clock::now();
+      // only gossip if we have changes
+      if (local_changeset.size() > 0) {
+        AddressKeysetMap addr_keyset_map; // TODO: how to get threads and populate 
+
+      string serialized = kZmqUtil->recv_string(&lambda_ip_collection_puller);
+
+      lambda_ip_collection_handler(seed, serialized,
+                    pending_gossip,
+                    stored_key_map,
+                    wt, serializers,
+                    pushers, log);
+
+        send_gossip(addr_keyset_map, pushers, serializers, stored_key_map); 
+        local_changeset.clear();
+      }
+
+      gossip_start = std::chrono::system_clock::now();
+      auto time_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                              std::chrono::system_clock::now() - work_start)
+                              .count();
+
+      working_time += time_elapsed;
+      working_time_map[9] += time_elapsed;
+    }
+    
 
     // Collect and store internal statistics,
     // fetch the most recent list of cache IPs,
@@ -730,15 +765,15 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
 }
 
 int main(int argc, char *argv[]) {
-  string log_file = "log_master.txt";
-  string log_name = "server_log_master";
-  auto log = spdlog::basic_logger_mt(log_name, log_file, true);
-  log->flush_on(spdlog::level::info);
+  // string log_file = "log_master.txt";
+  // string log_name = "server_log_master";
+  // auto log = spdlog::basic_logger_mt(log_name, log_file, true);
+  // log->flush_on(spdlog::level::info);
   if (argc != 1) {
     std::cerr << "Usage: " << argv[0] << std::endl;
     return 1;
   }
-  log->info("reached here");
+  // log->info("reached here");
 
   // populate metadata
   char *stype = getenv("SERVER_TYPE");
