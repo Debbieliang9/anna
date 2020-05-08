@@ -100,6 +100,8 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
 
   map<Key, KeyReplication> key_replication_map;
 
+  set<string> ip_set;
+
   // ZMQ socket for asking kops server for IP addrs of functional nodes.
   zmq::socket_t func_nodes_requester(context, ZMQ_REQ);
   if (management_ip != "NULL") {
@@ -308,7 +310,7 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
   auto report_end = std::chrono::system_clock::now();
 
   unsigned long long working_time = 0;
-  unsigned long long working_time_map[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  unsigned long long working_time_map[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   unsigned epoch = 0;
 
   // enter event loop
@@ -438,6 +440,21 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
       working_time_map[7] += time_elapsed;
     }
 
+    if (pollitems[9].revents & ZMQ_POLLIN) {
+      auto work_start = std::chrono::system_clock::now();
+
+      string serialized = kZmqUtil->recv_string(&lambda_ip_collection_puller); 
+
+      ip_set.insert(serialized);
+
+      auto time_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                              std::chrono::system_clock::now() - work_start)
+                              .count();
+
+      working_time += time_elapsed;
+      working_time_map[9] += time_elapsed;
+    }
+
     // gossip updates to other threads
     gossip_end = std::chrono::system_clock::now();
     if (std::chrono::duration_cast<std::chrono::microseconds>(gossip_end -
@@ -449,7 +466,9 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
         AddressKeysetMap addr_keyset_map;
 
         bool succeed;
+        // set<string> ips;
         for (const Key &key : local_changeset) {
+          // addr_keyset_map[ip].insert(key)
           // Get the threads that we need to gossip to.
           ServerThreadList threads = kHashRingUtil->get_responsible_threads(
               wt.replication_response_connect_address(), key, is_metadata(key),
@@ -489,32 +508,30 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
       working_time_map[8] += time_elapsed;
     }
 
-    if (pollitems[9].revents & ZMQ_POLLIN) {
-    // gossip updates to other threads
-      auto work_start = std::chrono::system_clock::now();
-      // only gossip if we have changes
-      if (local_changeset.size() > 0) {
-        AddressKeysetMap addr_keyset_map; // TODO: how to get threads and populate 
+    // broadcast updates to all lambdas
+    auto work_start = std::chrono::system_clock::now();
+    if (local_changeset.size() > 0) {
+        AddressKeysetMap addr_keyset_map;
+        // loop thru IP address  zmq.send(IPs + "...") -> recv_string   TCP://IP...
+        for (const Key &key : local_changeset) {
+          vector<string> v;
+          split(key, '_', v);
+          if (v[0] != "solution") {
+            continue;
+          }
+          for (const string &ip: ip_set) {
+            addr_keyset_map[ip].insert(key);
+          }
+        }
 
-      string serialized = kZmqUtil->recv_string(&lambda_ip_collection_puller);
-
-      lambda_ip_collection_handler(seed, serialized,
-                    pending_gossip,
-                    stored_key_map,
-                    wt, serializers,
-                    pushers, log);
-
-        send_gossip(addr_keyset_map, pushers, serializers, stored_key_map); 
-        local_changeset.clear();
-      }
-
-      gossip_start = std::chrono::system_clock::now();
+      send_gossip(addr_keyset_map, pushers, serializers, stored_key_map); 
+      local_changeset.clear();    
       auto time_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
                               std::chrono::system_clock::now() - work_start)
                               .count();
 
       working_time += time_elapsed;
-      working_time_map[9] += time_elapsed;
+      working_time_map[10] += time_elapsed;
     }
     
 
