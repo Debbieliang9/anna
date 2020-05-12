@@ -495,7 +495,7 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
           }
         }
 
-        send_gossip(addr_keyset_map, pushers, serializers, stored_key_map);
+        send_gossip_solution(addr_keyset_map, pushers, serializers, stored_key_map);
         local_changeset.clear();
       }
 

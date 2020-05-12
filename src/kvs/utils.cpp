@@ -52,6 +52,48 @@ void send_gossip(AddressKeysetMap &addr_keyset_map, SocketCache &pushers,
   }
 }
 
+
+void send_gossip_solution(AddressKeysetMap &addr_keyset_map, SocketCache &pushers,
+                 SerializerMap &serializers,
+                 map<Key, KeyProperty> &stored_key_map) {
+  map<Address, KeyResponse> gossip_map;
+
+  for (const auto &key_pair : addr_keyset_map) {
+    string address = key_pair.first;
+    RequestType type;
+    RequestType_Parse("PUT", &type);
+    gossip_map[address].set_type(type);
+
+    for (const auto &key : key_pair.second) {
+      LatticeType type;
+      if (stored_key_map.find(key) == stored_key_map.end()) {
+        // we don't have this key stored, so skip
+        continue;
+      } else {
+        type = stored_key_map[key].type_;
+      }
+
+
+
+      auto res = process_get(key, serializers[type]);
+
+      if (res.second == 0) {
+        KeyTuple *tp = gossip_map[address].add_tuples();
+        tp->set_key(std::move(key));
+        tp->set_lattice_type(std::move(type));
+        tp->set_payload(std::move(res.first));
+      }
+    }
+  }
+
+  // send gossip
+  for (const auto &gossip_pair : gossip_map) {
+    string serialized;
+    gossip_pair.second.SerializeToString(&serialized);
+    kZmqUtil->send_string(serialized, &pushers[gossip_pair.first]);
+  }
+}
+
 std::pair<string, AnnaError> process_get(const Key &key,
                                          Serializer *serializer, bool delta, const string &previous_payload) {
   AnnaError error = AnnaError::NO_ERROR;

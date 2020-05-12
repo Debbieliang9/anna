@@ -91,6 +91,10 @@ void send_gossip(AddressKeysetMap &addr_keyset_map, SocketCache &pushers,
                  SerializerMap &serializers,
                  map<Key, KeyProperty> &stored_key_map);
 
+void send_gossip_solution(AddressKeysetMap &addr_keyset_map, SocketCache &pushers,
+                 SerializerMap &serializers,
+                 map<Key, KeyProperty> &stored_key_map);
+
 std::pair<string, AnnaError> process_get(const Key &key,
                                          Serializer *serializer, bool delta = false, const string& previous_payload = "");
 
