@@ -85,6 +85,10 @@ const unsigned kKopsRestartCountPort = 7000;
 // executor nodes.
 const unsigned kKopsFuncNodesPort = 7002;
 
+// The port on which the server will listen for IPs from
+// executor nodes.
+const unsigned kExecutorIPPort = 7200;
+
 class ServerThread {
   Address public_ip_;
   Address public_base_;
@@ -171,6 +175,10 @@ public:
 
   Address cache_ip_response_bind_address() const {
     return kBindBase + std::to_string(tid_ + kCacheIpResponsePort);
+  }
+
+  Address lambda_ip_collection_bind_address() const {
+    return kBindBase + std::to_string(tid_ + kExecutorIPPort); // TODO
   }
 
   Address gossip_connect_address() const {
