@@ -85,6 +85,8 @@ const unsigned kKopsRestartCountPort = 7000;
 // executor nodes.
 const unsigned kKopsFuncNodesPort = 7002;
 
+const unsigned kExecutorIPPort = 7200;
+
 class ServerThread {
   Address public_ip_;
   Address public_base_;
@@ -251,6 +253,10 @@ public:
 
   Address replication_change_bind_address() const {
     return kBindBase + std::to_string(tid_ + kRoutingReplicationChangePort);
+  }
+
+  Address lambda_ip_collection_bind_address() const {
+    return kBindBase + std::to_string(tid_ + kExecutorIPPort); // TODO
   }
 };
 

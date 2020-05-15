@@ -440,7 +440,7 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
       working_time_map[7] += time_elapsed;
     }
 
-    if (pollitems[9].revents & ZMQ_POLLIN) {
+    if (pollitems[8].revents & ZMQ_POLLIN) {
       auto work_start = std::chrono::system_clock::now();
 
       string serialized = kZmqUtil->recv_string(&lambda_ip_collection_puller); 
@@ -452,7 +452,7 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
                               .count();
 
       working_time += time_elapsed;
-      working_time_map[9] += time_elapsed;
+      working_time_map[8] += time_elapsed;
     }
 
     // gossip updates to other threads
@@ -505,7 +505,7 @@ void run(unsigned thread_id, Address public_ip, Address private_ip,
                               .count();
 
       working_time += time_elapsed;
-      working_time_map[8] += time_elapsed;
+      working_time_map[9] += time_elapsed;
     }
 
     // broadcast updates to all lambdas
